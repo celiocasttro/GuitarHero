@@ -32,9 +32,13 @@ jobs:
         run: npx cap add ios
       - name: Sync Capacitor
         run: npx cap sync ios
+      - name: Verify CocoaPods workspace
+        run: |
+          test -d ios/App/App.xcworkspace
+          test -f ios/App/Podfile
       - name: Build iOS device app (unsigned)
         run: |
-          xcodebuild -project ios/App/App.xcodeproj \
+          xcodebuild -workspace ios/App/App.xcworkspace \
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
