@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#08090d"><title>Rock Hero</title>
+<style>
+:root{--bg:#08090d;--panel:#11141d;--red:#ff344d;--green:#35e875;--yellow:#ffe04b;--blue:#38a8ff;--orange:#ff9c3a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:white;font-family:system-ui,-apple-system,sans-serif;touch-action:manipulation}body{display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 0,#222638 0,#08090d 62%)}button{font:inherit;cursor:pointer;border:0;color:white}
+#app{width:100%;height:100%;max-width:900px;display:flex;flex-direction:column;padding:env(safe-area-inset-top) 12px env(safe-area-inset-bottom);gap:10px}
+header{display:flex;justify-content:space-between;align-items:center;padding:8px 5px}.brand{font-weight:1000;letter-spacing:2px;font-size:clamp(20px,5vw,30px);text-shadow:0 0 18px #ff344d66}.brand span{color:var(--red)}.stats{display:flex;gap:14px;text-align:right;font-weight:800}.stats small{display:block;color:#9ca3b5;font-size:10px;letter-spacing:1px}.stats b{font-size:18px}
+#stage{position:relative;flex:1;min-height:0;border:1px solid #303747;border-radius:18px;overflow:hidden;background:linear-gradient(#151a27,#08090d 65%);box-shadow:0 18px 70px #0009}
+#game{display:block;width:100%;height:100%;touch-action:none}
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;background:#070910dd;backdrop-filter:blur(8px)}
+.card{width:min(100%,420px)}h1{font-size:clamp(30px,9vw,52px);line-height:.95;margin:0 0 12px;font-weight:1000;font-style:italic}h1 em{color:var(--red);font-style:normal}.sub{color:#b6bfd0;line-height:1.5;margin:0 0 22px}.mainbtn{width:100%;padding:16px;border-radius:12px;background:linear-gradient(110deg,#ff344d,#c80032);font-weight:900;letter-spacing:1px;box-shadow:0 8px 28px #ff344d35}.secondary{background:#242a39;margin-top:10px}.difficulty{display:flex;gap:8px;margin:0 0 14px}.difficulty button{flex:1;border:1px solid #3a4153;border-radius:9px;background:#151a27;padding:10px 4px;font-size:12px}.difficulty button.active{border-color:var(--red);background:#481722}
+#controls{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:2px 0 8px}.pad{height:clamp(58px,11vh,88px);border-radius:14px;background:#171b25;border:2px solid var(--c);box-shadow:inset 0 -5px #0005,0 0 12px color-mix(in srgb,var(--c) 20%,transparent);font-size:clamp(18px,5vw,26px);font-weight:1000;color:var(--c);touch-action:none;user-select:none}.pad.hit,.pad:active{background:var(--c);color:#08090d;transform:scale(.97);box-shadow:0 0 24px var(--c)}
+.hint{text-align:center;color:#81899b;font-size:11px;padding-bottom:4px}
+@media(orientation:landscape){#app{max-width:1100px;gap:5px}header{padding:3px 5px}.pad{height:58px}#controls{padding-bottom:3px}.hint{display:none}}
+</style>
+</head>
+<body><main id="app">
+<header><div class="brand">ROCK<span>HERO</span></div><div class="stats"><div><small>SCORE</small><b id="score">0</b></div><div><small>COMBO</small><b id="combo">0x</b></div><div><small>PRECISÃO</small><b id="acc">100%</b></div></div></header>
+<section id="stage"><canvas id="game"></canvas><div id="overlay"><div class="card"><h1>FEEL THE<br><em>RHYTHM</em></h1><p class="sub">Toque nas notas quando chegarem à linha de acerto. Acerte sequências para multiplicar seus pontos!</p><div class="difficulty"><button data-d="easy">FÁCIL</button><button data-d="normal" class="active">NORMAL</button><button data-d="hard">DIFÍCIL</button></div><button class="mainbtn" id="start">▶ COMEÇAR</button><button class="mainbtn secondary" id="help">COMO JOGAR</button></div></div></section>
+<section id="controls" aria-label="Botões de nota"><button class="pad" data-lane="0" style="--c:var(--green)">●</button><button class="pad" data-lane="1" style="--c:var(--red)">●</button><button class="pad" data-lane="2" style="--c:var(--yellow)">●</button><button class="pad" data-lane="3" style="--c:var(--blue)">●</button><button class="pad" data-lane="4" style="--c:var(--orange)">●</button></section><div class="hint">No teclado: A · S · D · F · G &nbsp; • &nbsp; Feito para jogar no iPhone</div>
+</main>
+<script>
+(()=>{
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),stage=document.getElementById('stage'),overlay=document.getElementById('overlay');
+const colors=['#35e875','#ff344d','#ffe04b','#38a8ff','#ff9c3a'],keys=['a','s','d','f','g'];
+let W=0,H=0,dpr=1,notes=[],running=false,score=0,combo=0,hitCount=0,total=0,miss=0,startAt=0,lastBeat=0,difficulty='normal',bpm=110,beatMs=60000/bpm,audio=null,raf=0,spawnIndex=0;
+const $=id=>document.getElementById(id);
+function resize(){const r=stage.getBoundingClientRect();dpr=Math.min(devicePixelRatio||1,2);W=r.width;H=r.height;canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}
+new ResizeObserver(resize).observe(stage);resize();
+function laneW(){return W/5}function hitY(){return H*.81}function travel(){return H*.72}function speed(){return travel()/((difficulty==='easy'?2100:difficulty==='hard'?1250:1650))}
+function draw(){ctx.clearRect(0,0,W,H);const lw=laneW(),hy=hitY();
+const bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#161b29');bg.addColorStop(1,'#07090f');ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+for(let i=0;i<5;i++){const x=i*lw;ctx.fillStyle=i%2?'#ffffff05':'#ffffff09';ctx.fillRect(x,0,lw,H);ctx.strokeStyle='#aab3c31b';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();ctx.strokeStyle=colors[i]+'28';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x+lw*.5,0);ctx.lineTo(x+lw*.5,hy+14);ctx.stroke()}
+ctx.fillStyle='#fff';ctx.font='800 10px system-ui';ctx.textAlign='center';ctx.fillText('NOTAS',W/2,18);
+notes.forEach(n=>{if(n.done)return;const y=hy-(n.time-(performance.now()-startAt))*speed();if(y<-40||y>H+40)return;const x=n.lane*lw+lw/2,r=Math.min(17,lw*.27);ctx.shadowBlur=18;ctx.shadowColor=colors[n.lane];ctx.fillStyle=colors[n.lane];ctx.beginPath();ctx.roundRect(x-r,y-r,r*2,r*2,7);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,Math.max(3,r*.27),0,Math.PI*2);ctx.fill()});
+ctx.fillStyle='#ffffff08';ctx.fillRect(0,hy-26,W,52);ctx.strokeStyle='#fff';ctx.globalAlpha=.8;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,hy);ctx.lineTo(W,hy);ctx.stroke();ctx.globalAlpha=1;
+for(let i=0;i<5;i++){const x=i*lw+lw/2;ctx.strokeStyle=colors[i];ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,hy,Math.min(19,lw*.3),0,Math.PI*2);ctx.stroke()}
+if(running){const now=performance.now()-startAt;notes.forEach(n=>{if(!n.done&&now-n.time>260){n.done=true;combo=0;miss++;updateStats()}});if(now-lastBeat>beatMs){lastBeat=now;spawn();}raf=requestAnimationFrame(draw)}
+}
+function spawn(){const count=difficulty==='hard'&&spawnIndex%5===3?2:1;for(let j=0;j<count;j++){let lane=Math.floor(Math.random()*5);if(notes.length&&Math.random()<.3)lane=notes[notes.length-1].lane;notes.push({lane,time:performance.now()-startAt+travel()/speed(),done:false})}spawnIndex++}
+function updateStats(){$('score').textContent=score.toLocaleString('pt-BR');$('combo').textContent=combo+'x';$('acc').textContent=(total?Math.max(0,Math.round(hitCount/total*100)):100)+'%'}
+function tap(lane){const pad=document.querySelector('[data-lane="'+lane+'"]');pad.classList.add('hit');setTimeout(()=>pad.classList.remove('hit'),100);if(!running)return;const now=performance.now()-startAt;let best=null,delta=1e9;for(const n of notes){if(n.done||n.lane!==lane)continue;const d=Math.abs(now-n.time);if(d<delta){delta=d;best=n}}total++;if(best&&delta<260){best.done=true;hitCount++;combo++;const points=delta<75?100:delta<150?70:40;score+=points*Math.min(4,1+Math.floor(combo/10));if(audio){try{const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=[261,293,329,392,440][lane];g.gain.setValueAtTime(.06,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.08);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+.08)}catch(e){}}}else{combo=0;score=Math.max(0,score-10)}updateStats()}
+document.querySelectorAll('.pad').forEach(p=>{p.addEventListener('pointerdown',e=>{e.preventDefault();tap(+p.dataset.lane)})});
+document.addEventListener('keydown',e=>{if(e.repeat)return;const k=keys.indexOf(e.key.toLowerCase());if(k>=0){e.preventDefault();tap(k)}if(e.key===' '&&!running&&overlay.style.display!=='none')start()});
+document.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',()=>{difficulty=b.dataset.d;document.querySelectorAll('[data-d]').forEach(x=>x.classList.toggle('active',x===b))}));
+function stop(){running=false;cancelAnimationFrame(raf);overlay.style.display='flex';overlay.innerHTML='<div class="card"><h1>FIM DE<br><em>JOGO</em></h1><p class="sub">Pontuação: <b>'+score.toLocaleString('pt-BR')+'</b><br>Precisão: <b>'+(total?Math.round(hitCount/total*100):0)+'%</b><br>Maior combo: <b>'+combo+'</b></p><button class="mainbtn" id="again">↻ JOGAR NOVAMENTE</button></div>';document.getElementById('again').onclick=start}
+function start(){overlay.style.display='none';notes=[];score=combo=hitCount=total=miss=spawnIndex=0;running=true;startAt=performance.now();lastBeat=0;audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume();updateStats();spawn();draw();setTimeout(()=>{if(running)stop()},60000)}
+$('start').onclick=start;$('help').onclick=()=>{overlay.innerHTML='<div class="card"><h1>COMO <em>JOGAR</em></h1><p class="sub">1. Observe as notas descendo pelas cinco pistas.<br>2. Toque no botão da mesma cor quando a nota chegar ao círculo.<br>3. Acertos seguidos aumentam o combo e os pontos.<br><br>Use os botões coloridos ou as teclas A S D F G.</p><button class="mainbtn" id="back">VOLTAR</button></div>';document.getElementById('back').onclick=()=>location.reload()};
+draw();
+})();
+</script></body></html>
