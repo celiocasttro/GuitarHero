@@ -1,0 +1,9 @@
+{
+  "appId": "com.celiocastro.rockhero",
+  "appName": "Rock Hero",
+  "webDir": ".",
+  "ios": {
+    "contentInset": "automatic",
+    "preferredContentMode": "mobile"
+  }
+}
